@@ -1,7 +1,9 @@
 """
-FastAPI app to verify connection to the MAX messenger API.
-- Locally: prints status and waits for ENTER.
-- On Bothost / container: skips the CLI wait and just serves /health.
+FastAPI app to verify connection to the MAX messenger API
+and start the bot interaction loop.
+
+- Locally: prints status and (optionally) waits for ENTER.
+- On Bothost / container: skips the CLI wait, starts polling, serves /health.
 """
 
 import os
@@ -28,7 +30,7 @@ else:
 MAX_API_TOKEN: str | None = os.getenv("MAX_API_TOKEN")
 MAX_API_BASE_URL: str = os.getenv("MAX_API_BASE_URL", "https://platform-api2.max.ru")
 
-# When true (default on Bothost), skip the interactive CLI wait.
+# When true (local dev), wait for ENTER on shutdown. Off on Bothost.
 INTERACTIVE: bool = os.getenv("INTERACTIVE", "false").lower() in ("1", "true", "yes")
 
 REQUEST_TIMEOUT = 15.0
@@ -105,14 +107,37 @@ async def lifespan(app: FastAPI):
     success, status, payload = await check_max_api_connection()
     report_connection(success, status, payload)
 
+    # --- optional interactive wait (local dev only) ------------------------
     app.state.cli_task = None
     if INTERACTIVE:
         logger.info("Interactive mode ON — waiting for user input.")
         app.state.cli_task = asyncio.create_task(wait_for_user_input())
 
-    yield
+    # --- start the bot polling loop if the connection is OK ----------------
+    app.state.polling_task = None
+    if success:
+        try:
+            from interaction import run_interaction
 
+            app.state.polling_task = asyncio.create_task(run_interaction())
+            logger.info("Bot interaction polling task started.")
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Failed to start interaction polling: %s", exc)
+
+    yield  # <-- app is running here
+
+    # --- shutdown ----------------------------------------------------------
     logger.info("Shutting down...")
+
+    if app.state.polling_task:
+        app.state.polling_task.cancel()
+        try:
+            await app.state.polling_task
+        except asyncio.CancelledError:
+            pass
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Polling task ended with error: %s", exc)
+
     if app.state.cli_task:
         app.state.cli_task.cancel()
         try:
@@ -121,7 +146,7 @@ async def lifespan(app: FastAPI):
             pass
 
 
-app = FastAPI(title="MAX API Connect Checker", version="1.1.0", lifespan=lifespan)
+app = FastAPI(title="MAX API Connect Checker", version="1.2.0", lifespan=lifespan)
 
 
 # ---------------------------------------------------------------------------
