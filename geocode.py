@@ -1,23 +1,33 @@
 from geopy.geocoders import Nominatim
-import numpy as np
+from geopy.exc import GeocoderServiceError, GeocoderQueryError
+from timezonefinder import TimezoneFinder
+
+
+_tf = TimezoneFinder()
+_geoloc = Nominatim(user_agent="talk-bot/1.0 (contact@example.com)")
+
 
 def geocode_city(city: str) -> dict:
-    geoloc = Nominatim(user_agent="geopy_test")
-    location = geoloc.geocode(city)
-    
+    try:
+        location = _geoloc.geocode(city, language="ru", exactly_one=True)
+    except (GeocoderServiceError, GeocoderQueryError) as exc:
+        return {"error": f"Geocoder error: {exc}"}
+
     if not location:
         return {"error": f"City '{city}' not found"}
-    
-    # Use attributes instead of unpacking to avoid (lat, lon, name) tuple issues
-    lat = location.latitude
-    lon = location.longitude
-    
+
+    lat = float(location.latitude)
+    lon = float(location.longitude)
+
+    tz = _tf.timezone_at(lat=lat, lng=lon) or "UTC"
+
     return {
         "name": city,
-        "timezone": "Europe/Moscow",
-        "latitude": float(lat),
-        "longitude": float(lon)
+        "timezone": tz,
+        "latitude": lat,
+        "longitude": lon,
     }
+
 
 if __name__ == "__main__":
     city = input("Enter the city: ")
