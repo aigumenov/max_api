@@ -1,6 +1,6 @@
 """
 FastAPI app to verify connection to the MAX messenger API
-and start the bot interaction loop.
+and start the astro-bot interaction loop.
 """
 
 import os
@@ -109,14 +109,13 @@ async def lifespan(app: FastAPI):
     app.state.polling_task = None
     if success:
         try:
-            # передаём функцию геокодирования в polling-цикл
             from interaction import run_interaction
             from geocode import geocode_city
 
             app.state.polling_task = asyncio.create_task(
                 run_interaction(geocode_func=geocode_city)
             )
-            logger.info("Bot interaction polling task started.")
+            logger.info("Astro-bot interaction polling task started.")
         except Exception as exc:  # noqa: BLE001
             logger.exception("Failed to start interaction polling: %s", exc)
 
@@ -141,7 +140,7 @@ async def lifespan(app: FastAPI):
             pass
 
 
-app = FastAPI(title="MAX API Connect Checker", version="1.3.0", lifespan=lifespan)
+app = FastAPI(title="MAX Astro Bot", version="2.0.0", lifespan=lifespan)
 
 
 # ---------------------------------------------------------------------------
@@ -149,7 +148,7 @@ app = FastAPI(title="MAX API Connect Checker", version="1.3.0", lifespan=lifespa
 # ---------------------------------------------------------------------------
 @app.get("/")
 async def root():
-    return {"service": "max-api-connect", "status": "running"}
+    return {"service": "max-astro-bot", "status": "running"}
 
 
 @app.get("/health")

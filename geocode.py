@@ -5,11 +5,17 @@ import time
 
 _tf = TimezoneFinder()
 _geoloc = Nominatim(
-    user_agent="talk-bot/1.0 (aigumenov@yandex.ru)",
+    user_agent="astro-bot/1.0 (aigumenov@yandex.ru)",
     timeout=10,  # seconds
 )
 
+
 def geocode_city(city: str, retries: int = 3) -> dict:
+    """Геокодирование населённого пункта.
+
+    Возвращает dict с полями name, timezone, latitude, longitude
+    либо {"error": "..."} при неудаче.
+    """
     location = None
     for attempt in range(retries):
         try:
